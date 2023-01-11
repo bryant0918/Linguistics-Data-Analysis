@@ -1,0 +1,147 @@
+---
+title: "Inferential_stats"
+author: "Bryant"
+date: "2022-11-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r, echo=False}
+library(tidyverse)
+#install.packages("rstatix")
+library(rstatix)
+library(joeysvowels)
+#install.packages("vcd")
+library(vcd)
+```
+
+## Load Data
+
+```{r pressure, echo=FALSE}
+setwd("C:/Users/bryan/Documents/School/Fall 2022/Ling")
+span_ital = read_csv("span_ital_speaking_rate.csv") %>% 
+  print()
+
+```
+# Check Assumptions
+```{r}
+# Shapiro test gives us p value if they're normal (We want p>.05)
+span_ital %>% 
+  group_by(language) %>% 
+  shapiro_test(syllables)
+
+# Levene test gives us p value if they're similar variance (We want p>.05)
+span_ital %>% 
+  levene_test(syllables ~ language)
+
+```
+
+# Run t-test
+```{r}
+span_ital %>% 
+  t_test(syllables ~ language, var.equal = TRUE, alternative = "less")
+```
+
+```{r}
+span_ital %>% 
+  cohens_d(syllables ~ language, var.equal = TRUE)
+```
+# ANOVA
+```{r}
+midpoints = joeysvowels::midpoints %>% 
+  filter(vowel %in% c("FLEECE", "KIT", "FACE", "DRESS", "TRAP")) %>% 
+  mutate(dur = end - start,
+         vowel = factor(vowel, levels = c("FLEECE", "KIT", "FACE", "DRESS", "TRAP"))) %>% 
+  select(vowel_id, word, dur, vowel) %>% 
+  print()
+
+
+```
+
+```{r}
+ggplot(midpoints, aes(vowel, dur)) +
+  geom_violin() +
+  geom_boxplot()
+```
+
+```{r}
+midpoints %>% 
+  group_by(vowel) %>% 
+  summarize(n = n(),
+            mean = mean(dur),
+            sd = sd(dur))
+
+```
+
+# Check for normality
+```{r}
+midpoints %>% 
+  group_by(vowel) %>% 
+  rstatix::shapiro_test(dur)
+
+```
+
+# Check if standard deviations are significantly different
+```{r}
+midpoints %>% 
+  levene_test(dur ~ vowel)
+```
+
+# Run ANOVA
+```{r}
+midpoints %>% 
+  anova_test(dur ~ vowel)
+# We can conclude that from the 5 groups at least one of them is not the same as the other 4
+```
+
+# Tukuy test (look at pairs individually)
+```{r}
+midpoints %>% 
+  tukey_hsd(dur~vowel)
+```
+# Chi-Squared Test
+```{r}
+mlk = read_csv("mlk_full.csv") %>% 
+  print()
+
+```
+## Visualize
+```{r}
+ggplot(mlk, aes(speech, fill = realization)) +
+  geom_bar(position=position_dodge()) +
+  #geom_bar(position = position_fill())
+```
+## Create Table
+```{r}
+mlk_tbl = xtabs(~realization + speech, data=mlk) %>% 
+  print()
+```
+
+## Run the chi-squared test
+```{r}
+rstatix::chisq_test(mlk_tbl)
+```
+# type of chisquared test between each pair
+```{r}
+pairwise_prop_test(mlk_tbl)
+```
+
+## Get cramer's v: 0-1 is small, 1-3 is medium, 3-5 is large
+```{r}
+vcd::assocstats(mlk_tbl)
+```
+
+
+
+
+
+
+
+
+
+

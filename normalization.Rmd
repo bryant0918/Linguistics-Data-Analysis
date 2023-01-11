@@ -1,0 +1,111 @@
+---
+title: "normalization"
+author: "Bryant"
+date: "2022-10-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+```{r}
+remove.packages("rlang")
+install.packages("rlang")
+library(tidyverse)
+library(joeysvowels)
+
+# for plotting
+library(ggforce)
+library(ggthemes)
+
+remotes::install_github("joeystanley/joeyr")
+library(joeyr)
+
+idaho = joeysvowels::idahoans %>% 
+  tibble() %>% 
+  filter(speaker %in% c("01", "02")) %>% 
+  select(-F3, -F4) %>% 
+  unite(speaker, speaker, sex) %>% 
+  print()
+```
+
+
+```{r}
+idaho %>%
+    group_by(speaker, vowel) %>%
+    summarize(across(c(F1, F2), mean)) %>%
+    ungroup() %>%
+    ggplot(aes(F2, F1, color = speaker)) + 
+    geom_text(aes(label= vowel)) + 
+    ggforce::geom_mark_hull(aes(fill = speaker)) + 
+    scale_x_reverse() + 
+    scale_y_reverse() + 
+    ggthemes::scale_color_ptol() + 
+    ggthemes::scale_fill_ptol() + 
+    theme_minimal()
+```
+## Lobanov
+```{r}
+idaho_lob = idaho %>% 
+  group_by(speaker) %>% 
+  mutate(F1_z = scale(F1),
+         F2_z = scale(F2)) %>% 
+  print()
+```
+
+```{r}
+idaho_lob %>%
+    group_by(speaker, vowel) %>%
+    summarize(across(c(F1_z, F2_z), mean)) %>%
+    ungroup() %>%
+    ggplot(aes(F2_z, F1_z, color = speaker)) + 
+    geom_text(aes(label= vowel)) + 
+    ggforce::geom_mark_hull(aes(fill = speaker)) + 
+    scale_x_reverse(expand = expansion(mult=0, add=.5)) + 
+    scale_y_reverse(expand = expansion(mult=0, add=.5)) + 
+    ggthemes::scale_color_ptol() + 
+    ggthemes::scale_fill_ptol() + 
+    labs(x = "F2 (Lobanov-Normalized",
+         y = "F1 (Lobanov-Normalized") +
+    theme_wsj()
+```
+
+## Mearey 2 (ANAE)
+```{r}
+idaho_anae = idaho %>% 
+  rowid_to_column("id") %>%
+  group_by(speaker) %>% 
+  joeyr::norm_anae(hz_col = c(F1, F2),
+                   token_id = id,
+                   speaker_id = speaker) %>% 
+  print()
+```
+
+```{r}
+idaho_anae %>%
+    group_by(speaker, vowel) %>%
+    summarize(across(c(F1_anae, F2_anae), mean)) %>%
+    ungroup() %>%
+    ggplot(aes(F2_anae, F1_anae, color = speaker)) + 
+    geom_text(aes(label= vowel)) + 
+    ggforce::geom_mark_hull(aes(fill = speaker)) + 
+    scale_x_reverse() + 
+    scale_y_reverse() + 
+    ggthemes::scale_color_ptol() + 
+    ggthemes::scale_fill_ptol() + 
+    labs(x = "F2 (Lobanov-Normalized",
+         y = "F1 (Lobanov-Normalized") +
+    theme_wsj()
+```
+
+```{r}
+
+```
+
+```{r}
+
+```

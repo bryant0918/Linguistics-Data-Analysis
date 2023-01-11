@@ -1,0 +1,115 @@
+---
+title: "Inferential Stats Assignment"
+author: "Bryant"
+date: "2022-11-13"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 1: Regex and Gif
+
+Load our packages and data
+```{r, echo=FALSE}
+library(tidyverse)
+library(rstatix)
+df = read_csv("regex_gif_full.csv") %>% 
+  print()
+```
+## Visualize
+```{r}
+ggplot(df, aes(regex, fill = gif)) +
+  geom_bar(position=position_dodge())
+
+ggplot(df, aes(regex, fill = gif)) +
+  geom_bar(position = position_fill())
+```
+
+Here we can see that for both pronunciations of regex both pronunciations of gif are proportionally similar. Since we have two categorical variables we will run a chi^2 test and also find Cramer's V to tell us if there is an association.
+
+## Create Table
+```{r}
+df_tbl = xtabs(~gif + regex, data=df) %>% 
+  print()
+```
+
+## Run the chi-squared test
+```{r}
+rstatix::chisq_test(df_tbl)
+```
+Our Chi^2 test gave us a p value of .192 which is much larger than .05. This tells us that we do not have any reason to reject the null hypothesis that there is a significant difference between the two distributions. We will now find Cramer's V to further our investigation.
+
+## Get cramer's V
+```{r}
+vcd::assocstats(df_tbl)
+```
+Cramer's V is .09 which is very close to 0 and tells us there is a very weak association between how people say gif and regex. We can conclude that we have not found any significant evidence to tell us that certain people will say re[dʒ]ex because they say [dʒ]if or visa versa. We also did not find any evidence to suggest there is a negative correlation between the two that people will say [dʒ]if if they say re[g]ex.
+
+
+# Question 2: Subjective Frequencies
+
+## Get the Mean and Standard Deviation
+```{r}
+ratings = languageR::ratings
+ratings %>% 
+  group_by(Class) %>% 
+  summarize(n = n(),
+            mean = mean(meanFamiliarity),
+            sd = sd(meanFamiliarity))
+```
+## Visualize
+```{r}
+ggplot(ratings, aes(meanFamiliarity, color=Class, fill=Class)) + 
+  xlim(1,7) +
+  geom_density(alpha=.5)
+```
+
+These look kind of normal and they probably have the same standard deviation, but it is definitely worth testing our assumptions. We also note that our animal distribution looks overall "less" than our plant distribution for our t-test later.
+
+## Check for normality
+```{r}
+ratings %>% 
+  group_by(Class) %>% 
+  rstatix::shapiro_test(meanFamiliarity)
+```
+By the Shapiro test we see both our p values are over .05 so we can assume they are in fact normal enough to run our tests.
+
+## Check if standard deviations are significantly different
+```{r}
+ratings %>% 
+  levene_test(meanFamiliarity ~ Class)
+```
+Clearly we pass the Levene test with a p value of .68.
+
+
+## Run ANOVA
+```{r}
+ratings %>% 
+  anova_test(meanFamiliarity ~ Class)
+```
+We can conclude with a p value of .0001 which is much less than our threshold of .05 that there is a significant difference in average familiarity between plants and animals.
+
+
+## Run t-test
+```{r}
+ratings %>% 
+  t_test(meanFamiliarity ~ Class, var.equal = TRUE, alternative = "less")
+```
+The t-test tells us the same thing as the ANOVA test, except here we could specify our prior assumption after viewing the two distributions that animal is less than plant. Using this assumption it is even more clear that there is a significant difference by our p value of .000058. 
+
+## Cohen's D
+```{r}
+ratings %>% 
+  cohens_d(meanFamiliarity ~ Class, var.equal = TRUE)
+```
+This tells us that the means of the average familiarity between the two classes are almost a full standard deviation away from each other, which is large.
+
+
+
+
+
+
+
+

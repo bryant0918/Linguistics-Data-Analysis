@@ -1,0 +1,95 @@
+---
+title: "Descriptive Stats"
+author: "Bryant"
+date: "2022-11-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+getmode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+```
+
+```{r pressure, echo=FALSE}
+ling_ages = c(18,19,20,20,20,20,21,21,22)
+mean(ling_ages)
+median(ling_ages)
+getmode(ling_ages)
+
+num = which.max(table(ling_ages))
+
+print(num[1])
+
+```
+```{r}
+ling_ages_df = tibble(age = ling_ages) %>% 
+  print()
+
+ggplot(ling_ages_df, aes(age)) +
+  geom_histogram(binwidth=1, color = 'navy', fill = 'lightyellow')
+
+ggplot(ling_ages_df, aes(age)) +
+  geom_density(color = 'navy', fill = 'lightyellow')
+
+```
+
+```{r}
+violin_ages = c(10,10,11,12,12,13,13,15,85)
+
+mean(violin_ages)
+median(violin_ages)
+getmode(violin_ages)
+
+num = which.max(table(violin_ages))
+print(num[1])
+```
+# Dispersion
+```{r}
+vots = read_csv("vots.csv") %>% 
+  print()
+
+vots %>% 
+  group_by(language) %>% 
+  summarize(mean_VOT = mean(ms))
+```
+```{r}
+ggplot(vots, aes(language, ms)) + 
+  geom_violin()
+
+```
+
+```{r}
+ggplot(vots, aes(ms, color=language, fill=language)) + 
+  geom_density(alpha=.5)
+```
+```{r}
+sd(ling_ages)
+ling_z = scale(ling_ages)
+```
+```{r}
+tibble(age = ling_z) %>% 
+  ggplot(ling_z, aes(age)) +
+  geom_density(color = 'navy', fill = 'lightyellow')
+
+ggplot(ling_z, aes(ms, color=language, fill=language)) + 
+  geom_density(alpha=.5)
+```
+```{r}
+vots_z = vots %>% 
+  group_by(language) %>% 
+  mutate(ms_z = scale(ms))
+
+ggplot(vots_z, aes(ms_z, color=language, fill=language)) +
+  geom_density(alpha=.4)
+
+```

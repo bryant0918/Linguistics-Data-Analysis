@@ -1,0 +1,112 @@
+---
+title: "Outliers and Normalization"
+author: "Bryant"
+date: "2022-10-28"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(tidyverse)
+install.packages(c("ggthemes", "ggforce", "stopwords"))
+library(ggthemes)
+library(ggforce)
+library(stopwords)
+library(joeysvowels)
+remotes::install_github("joeystanley/joeyr")
+library(joeyr)
+
+```
+```{r}
+darla = joeysvowels::darla %>% 
+  tibble() %>% 
+  filter(!vowel %in% c("AY", "AW", "OY", "ER"),
+         stress==1,
+         !tolower(word) %in% stopwords::stopwords(),
+         !fol_seg %in% c("R","L","M","N","NG")) %>% 
+  print()
+
+```
+```{r}
+iy = darla %>% 
+  filter(vowel == "IY") %>% 
+  print()
+```
+
+```{r}
+darla_means = group_by(darla,vowel) %>% 
+  summarize(F1 = mean(F1),
+            F2 = mean(F2))
+
+ggplot(darla, aes(F2,F1, color=vowel))+
+  geom_point(alpha = .5) +
+  stat_ellipse(level=.67) +
+  geom_text(data = darla_means, aes(label=vowel), size=6) +
+  scale_x_reverse() + 
+  scale_y_reverse() +
+  theme_minimal() +
+  theme(legend.position = 'non')
+
+```
+# Z-score Method
+
+```{r}
+iy_normed = iy %>% select(word, F1, F2) %>% 
+  mutate(F1_z = scale(F1),
+         F2_z = scale(F2)) %>% 
+  filter(F1_z < 2 & F1_z > -2,
+         F2_z < 2 & F2_z > -2) %>% 
+  print()
+
+iy_better_normed = iy %>% select(word,F1,F2) %>% 
+  mutate(F1_z = scale(F1),
+         F2_z = scale(F2)) %>% 
+  filter(F1_z**2 + F2_z**2 < 4) %>% 
+  print()
+```
+```{r}
+ggplot(iy_normed, aes(F2,F1))+
+  geom_point(alpha = .5) +
+  stat_ellipse(level=.67) +
+  geom_text(data = darla_means, aes(label=vowel), size=6) +
+  scale_x_reverse() + 
+  scale_y_reverse() +
+  theme_minimal() +
+  theme(legend.position = 'non')
+```
+```{r}
+ggplot(iy_better_normed, aes(F2,F1))+
+  geom_point(alpha = .5) +
+  stat_ellipse(level=.67) +
+  geom_text(data = darla_means, aes(label=vowel), size=6) +
+  scale_x_reverse() + 
+  scale_y_reverse() +
+  theme_minimal() +
+  theme(legend.position = 'non')
+```
+```{r}
+darla_clean = darla %>% 
+  select(word,vowel,F1,F2) %>% 
+  group_by(vowel) %>% 
+  mutate(F1_z = scale(F1),
+         F2_z = scale(F2)) %>% 
+  filter(F1_z**2 + F2_z**2 < 4) %>% 
+  ungroup() %>% 
+  print()
+  
+```
+```{r}
+ggplot(darla_clean, aes(F2,F1, color=vowel))+
+  geom_point(alpha = .5) +
+  stat_ellipse(level=.67) +
+  geom_text(data = darla_means, aes(label=vowel), size=6) +
+  scale_x_reverse() + 
+  scale_y_reverse() +
+  theme_minimal() +
+  theme(legend.position = 'non')
+```

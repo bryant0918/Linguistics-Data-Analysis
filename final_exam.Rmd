@@ -1,0 +1,295 @@
+---
+title: "Final Exam"
+author: "Bryant"
+date: "2022-12-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE, echo = TRUE)
+```
+
+# Research Question
+
+What factors, if any, predict center of gravity of word-initial /f/ in this sample of Mexican Spanish?
+
+We will build a model to analyze the data in in order to determine which variables have an effect on the center of Gravity. We will group certain variables into sociodemographic, usage-based, and linguistic factors. 
+
+```{r}
+library("tidyverse")
+library("lmerTest")
+setwd("C:/Users/bryan/Documents/School/Fall 2022/Ling/")
+data = readxl::read_xlsx("data_Brown_Alba_2017.xlsx")
+```
+
+
+# Draw some Plots
+
+First we are going to plot all our variables separately to see what kind of effect it appears they each have individually on COG.
+
+## Continuous Variables on COG:
+
+```{r}
+cont_predictors <- c("age", "lexFreq", "FRC", "spchRate")
+for (predictor in cont_predictors) {
+  p1 <- data %>% 
+    ggplot(aes(.data[[predictor]], COG))+
+    geom_point(alpha = 0.5)+
+    geom_smooth(formula = y ~ x, method = lm)+
+    ggtitle(predictor)+
+    theme_minimal()
+  print(p1)
+}
+
+```
+
+## Categorical Variables on COG:
+
+```{r}
+categorical_predictors = c("sex", "word", "soundPre", "soundPost", "dip", "stress", "prevMention")
+for (predictor in categorical_predictors) {
+  p1 <- data %>% 
+    ggplot(aes(x = .data[[predictor]], y = COG))+
+    geom_boxplot(notch = TRUE)+
+    stat_summary(fun = mean)+
+    ggtitle(predictor)+
+    theme_bw()
+  print(p1)
+}
+```
+
+
+# Mixed-Effects Linear Regression
+
+First we make a multidimensional linear regression model with speaker and word as random intercepts.
+
+```{r}
+m1 <- lmerTest::lmer(COG ~ sex + age + FRC + lexFreq + spchRate + soundPre + soundPost + dip + stress + prevMention + (1 | spkr) + (1 | word), data = data)
+#summary(m1)
+AIC(m1)
+#print(m1, correlation=True)
+#print(vcov(m1))
+#cors = vcov(m1)
+```
+
+
+
+## Are Residuals normally distributed?
+
+```{r}
+cat("Mean of the residuals = ", mean(residuals(m1)))
+```
+
+```{r}
+tibble(res = residuals(m1)) %>% 
+  ggplot(aes(res))+
+  geom_histogram()+
+  ggtitle("Histogram of raw residuals")
+```
+
+```{r}
+res <- residuals(m1)
+
+ggplot(tibble(residuals(m1)), aes(sample = res))+
+  stat_qq()+
+  stat_qq_line()+
+  ggtitle("Q-Q plot of raw residuals")
+```
+
+### Shapiro Wilk Test to see if residuals are normally distributed
+
+We can run the Shapiro Wilk test because we only have 980 tokens.
+
+```{r}
+s1 <- tibble(res = residuals(m1)) %>% 
+  pull(res) %>% 
+  shapiro.test()
+s1
+```
+
+```{r}
+cat("p-value of Shapiro-Wilk test of raw frequencies: ", s1$p.value)
+```
+Unfortunately our p-value is well under .05 at 9.59e-12. This means we must perform a transformation to try and normalize them.
+
+#### Box Cox Transformation
+
+```{r}
+bc <- MASS::boxcox(data$COG ~ 1, lambda = seq(-10, 10, 1/100))
+lambda <- bc$x[which.max(bc$y)]
+```
+
+
+```{r}
+m2 <- data %>% 
+  mutate(bc_COG = (COG ^ lambda - 1) / lambda) %>% 
+  lmerTest::lmer(bc_COG ~ sex + age + FRC + lexFreq + spchRate + soundPre + soundPost + dip + stress + prevMention + (1 | spkr) + (1 | word), data = .)
+
+cat("Mean of the residuals = ", mean(residuals(m2)))
+
+```
+
+```{r}
+tibble(res = residuals(m2)) %>% 
+  ggplot(aes(res))+
+  geom_histogram()+
+  ggtitle("Histogram of Box-Cox residuals")
+```
+
+```{r}
+res = residuals(m2)
+
+ggplot(tibble(res), aes(sample = res))+
+  stat_qq()+
+  stat_qq_line()+
+  ggtitle("Q-Q plot of Box-Cox residuals")
+```
+
+
+```{r}
+s1 <- tibble(res = residuals(m2)) %>% 
+  pull(res) %>% 
+  shapiro.test()
+s1
+```
+
+```{r}
+cat("p-value of Shapiro-Wilk test of raw frequencies: ", s1$p.value)
+```
+
+As we can see our p-value is now .059! Thanks to our transformation we can say that there is significant evidence to reject the null hypothesis that our residuals are not normally distributed. 
+
+
+## Is there multicollinearity of the predictor variables?
+
+We only have a few continuous variables that we can visualize graphically.
+
+```{r}
+correlations <- data %>% 
+  select(age, lexFreq, FRC, spchRate) %>% 
+  cor()
+print(correlations)
+```
+
+```{r}
+corrplot::corrplot(correlations, type = "lower", diag = FALSE)
+```
+
+It appears that none of these continuous variables are too correlated with each other. We can check the VIF scores of the model to look at the categorical variables as well.
+We must make sure to use the new transformed model when evaluating our VIFs for consistency.
+```{r}
+car::vif(m2)
+```
+
+Levshina on pg. 160 of "How to do Linguistics with R" says that VIF scores generally should not exceed 5, and definitely should not be greater than 10. All of our VIF scores are below 5 so we can confidently conclude that our model has no Multicollinearity. 
+
+# Summary of our Model
+
+We will reference the p-values of this model as the true p-values as we make more base linear regression models below for individual factors.
+```{r}
+summary(m2)
+AIC(m2)
+```
+Notice our AIC value. The AIC is a measure of the relative entropy between the model and the empirical distribution. None of our individual models below will have a lower AIC (or even come close).  This defends our reasoning to use this model as the base truth. We only use the other models for comparison.
+
+# The Effect of Sociodemographic Aspects of the Speakers 
+## Age and Sex
+
+```{r}
+p3 <- data %>% 
+  ggplot(aes(x = age, y = COG))+
+  geom_point(alpha = 0.5)+
+  geom_smooth(formula = y ~ x, method = lm)+
+  stat_summary(fun = mean)+
+  facet_wrap(~sex)+
+  theme_bw()
+p3
+```
+
+This interaction plot shows us how the age of the speaker has an effect on the Center of Gravity for male and female speakers. We can see that the COG increases as age increases for females but the line of best fit for male speakers seems pretty constant across age.
+
+### A simple linear model of Age and Sex acting on COG
+```{r}
+m1 <- lm(COG ~ age + sex, data = data)
+print(summary(m1))
+print(AIC(m1))
+```
+
+An initial glance at the data and a simple linear model including only age and sex effecting our predicted COG would lead us to falsely believe that sex has a large correlation with COG and is very significant with a p-value of 1.31e-11. However, by adding the interaction term we will see that age, sex, and the interaction are immediately insignificant.
+
+### A linear model including the interaction term of age and sex.
+```{r}
+m1 <- lm(COG ~ age + sex + sex:age, data = data)
+print(summary(m1))
+AIC(m1)
+```
+
+As we can see the interaction term does have an effect on the overall performance of the model when our only predictor variables are age and sex. If our goal was to create a more accurate model we would include it in our mixed effects model, but since our only objective is to determine which variables are significant and age and sex are both already insignificant according to our model, the interaction term will not provide any new information.
+
+
+# The effect of the usage-based variables
+## frequency and ratio factors (lexFreq, FRC, prevMention)
+
+### Plots looking at the Interaction of LexFreq and FRC when wrapped around prevMention
+```{r}
+cont_predictors <- c("lexFreq", "FRC")
+for (predictor in cont_predictors) {
+  p3 <- data %>% 
+    ggplot(aes(x = .data[[predictor]], y = COG))+
+    geom_point(alpha = 0.5)+
+    geom_smooth(formula = y ~ x, method = lm)+
+    stat_summary(fun = mean)+
+    facet_wrap(~prevMention)+
+    theme_bw()
+  print(p3)
+}
+```
+
+As we can see the line of best fit is constant for Center of Gravity as lexical frequency increases when it is the first mention of the word. However, if the word has previously been mentioned before in the interview than the center of gravity slightly increases as the lexical frequency increases.
+
+When it comes to Form's Ratio of Conditioning (FRC) we can see that as the FRC increses the COG decreases independent of whether the word had previously been mentioned.
+
+
+```{r}
+m2 <- lm(COG ~ lexFreq + FRC + prevMention, data = data)
+print(summary(m2))
+AIC(m2)
+```
+Again we can see a difference between this more simple model, and our more complex mixed effects model with more variables.
+
+We see from this model that lexical Frequency has a p value of .15638 which is  greater than .05. Here we can assume that there is no significant effect of lexical Frequency on the Center of Gravity, even though there appeared to be a slight effect in our visualization. This is consistent from our larger model where Lexical Frequency had a p-value of .5.
+
+However, Forms' Ratio of Conditioning (FRC) has a p value of .00193 which is less than .05. We would therefore naively assume there is a correlation between FRC and the COG. from this simple model even though our larger model gives a p-value of .374 to FRC.
+
+Based off of this model we would also see there is only a slight correlation between prevMention and COG with a p-value of .02161.  Our larger model actually suggests a higher significance with a p-value of .0067. 
+
+
+```{r}
+m1 <- lm(COG ~ lexFreq + FRC + prevMention + prevMention:lexFreq, data = data)
+print(summary(m1))
+AIC(m1)
+```
+Here, we can see that not much was changed by adding the interaction term. It is still inconsistent with our larger model that includes more variables.
+
+However, here we can conclude that this group of usage-based variables does give a small effect on COG because of the factor of the variable prevMention.
+
+# The effect of the linguistic factors 
+## Phonological, Speech Rate, and Prosodic Variables 
+### (spchRate, soundPre, soundPost, dip, stress)
+
+```{r}
+m1 <- lm(COG ~ spchRate + soundPre + soundPost + dip + stress, data = data)
+print(summary(m1))
+AIC(m1)
+```
+This model here suggests that there are several linguistic factors that have an effect on COG. Right off the bat we can see that the Speech Rate and the previous sound both have a very significant effect on COG with p-values of .000825 and 5.41e-11 respectively which is consistent with our mixed effects model that give small p-values of 5.99e-05 and 6.00e-11.
+
+
+The following sound does appear to have a slight correlation for certain vowels. 'i' and 'o' give p-values of .0018 and .0201 which are both below our threshold. This is almost consistent with our large mixed effects model above that give similar but slightly larger p-values, however 'o' does not appear to be significant enough to reject the null hypothesis that there is no correlation with it's p-value of .09 above.
+
+# Conclusion
+
+We can conclude that the linguistic factors have the largest influence on and correlation with COG for the spanish speakers in this dataset with the most significant variables being the Speech Rate and the Previous Sound (whether it is a non-high vowel or not).
+
+Some other factors are also correlated with COG in this dataset, those being: a previous mention and the /f/ before an 'i'. 
+
