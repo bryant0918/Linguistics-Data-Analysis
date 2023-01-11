@@ -1,0 +1,60 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+plot(cars)
+library("tidyverse")
+```
+```{r}
+ggplot(cars,aes(speed,dist)) + 
+  geom_abline(slope = 4.5, intercept = -25, color = "blue", linetype=3)+
+  geom_point()
+
+view(cars)
+```
+
+```{r}
+fitted_model <- cars %>% 
+  lm(dist ~ speed, data = .) %>% 
+  print()
+```
+```{r}
+fitted_model %>% summary()
+
+coefs = coefficients(fitted_model)
+
+b = coefs["(Intercept)"]
+m = coefs["speed"]
+
+print(b)
+print(m)
+```
+
+
+```{r}
+cars <- cars %>% 
+  mutate(predicted = predict(fitted_model)) %>% 
+  print()
+```
+```{r}
+cars <- cars %>% 
+  mutate(residual = residuals(fitted_model)) %>% 
+  print()
+```
+
+
+```{r}
+cars %>% 
+  ggplot(aes(x = speed, y = dist))+
+  geom_smooth(method = lm, se = F, linetype = 3)+
+  geom_smooth(method = loess, se = F, color = 'red') +
+  geom_abline(slope = m, intercept = b, color = "blue", linetype=3)+
+  geom_point(aes(y = predicted), color = "red")+
+  geom_point()+
+  theme_minimal() +
+  geom_segment(aes(xend = speed, yend = predicted), alpha = 0.5) 
+```
+

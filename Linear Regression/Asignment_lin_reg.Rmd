@@ -1,0 +1,144 @@
+---
+title: "Assignment Linear Regression"
+author: "Bryant"
+date: "2022-11-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=F}
+library(tidyverse)
+data <- read_csv("cherokee_VOT.csv") %>% 
+  mutate(year = factor(year))
+```
+
+```{r}
+# Plot the data with the interaction included
+interaction_plot = data %>% 
+  ggplot(aes(x=consonant, y = VOT)) +
+  geom_boxplot(notch = T) +
+  stat_summary(fun = mean) +
+  facet_wrap(~year)
+interaction_plot
+```
+
+```{r}
+# Our naive original model.
+m1 <- lm(VOT ~ year + consonant, data = data)
+summary(m1)
+```
+```{r}
+AIC(m1)
+```
+
+```{r}
+# Create a second model with the interaction term included.
+m2 <- lm(VOT ~ year + consonant + year:consonant, data = data)
+summary(m2)
+```
+
+Our R^2 term increased with the addition of the interaction term from .0978 to .2825 which is almost triple what it was before.
+
+```{r}
+AIC(m2)
+```
+
+As we see our AIC score went down with the added interaction term.
+
+## Test if residuals are normally distributed
+
+```{r}
+# Get the mean of the residuals
+cat("Mean of the residuals = ", mean(residuals(m2)))
+```
+
+As we can see it our residual mean is very close to 0.
+
+```{r}
+# Show the residuals
+tibble(res = residuals(m2)) %>% 
+  ggplot(aes(res))+
+  geom_histogram()+
+  ggtitle("Histogram of raw residuals")
+```
+
+```{r}
+# Get the residuals of our model
+res <- residuals(m2)
+
+# Plot the residuals against the ideal distribution
+ggplot(tibble(residuals(m2)), aes(sample = res))+
+  stat_qq()+
+  stat_qq_line()+
+  ggtitle("Q-Q plot of raw residuals")
+```
+
+```{r}
+# Set up boxcox formula
+bc <- MASS::boxcox(data$VOT ~ 1, lambda = seq(-10, 10, 1/100))
+lambda <- bc$x[which.max(bc$y)]
+
+# Make a new model with the box cox formula
+m3 <- data %>% 
+  mutate(bc_vot = (VOT ^ lambda - 1) / lambda) %>% 
+  lm(bc_vot ~ year + consonant + year:consonant, data = .)
+```
+
+```{r}
+cat("Mean of the residuals = ", mean(residuals(m3)))
+```
+
+
+```{r}
+# Create a histogram
+tibble(res = residuals(m3)) %>% 
+  ggplot(aes(res))+
+  geom_histogram()+
+  ggtitle("Histogram of Box-Cox residuals")
+```
+
+
+```{r}
+res = residuals(m3)
+
+# Plot our new Box-Cox transformed residuals
+ggplot(tibble(res), aes(sample = res))+
+  stat_qq()+
+  stat_qq_line()+
+  ggtitle("Q-Q plot of Box-Cox residuals")
+```
+```{r}
+library("rstatix")
+res = tibble(res) 
+view(res)
+# Run the shapiro test on our residuals to test normality
+res %>% 
+  rstatix::shapiro_test(res)
+```
+
+By the Shapiro test since our p value is well over .05 we can say that our data is normally distributed enough.
+
+## Test multicollinearity
+
+We can also confidently say that year and consonant are not collinear based off our visualizations. However our interaction term year:consonant will obviously be partially dependent on both year and consonant.
+
+Just to double check here are our VIFs:
+```{r}
+# Show VIF of model (including interaction term)
+cat(car::vif(m2))
+
+# Show VIF of two predictor variables excluding interaction term
+print(car::vif(m2, type='predictor'))
+```
+As we can see our prediction was correct. The VIF including the two terms and the interaction term has signficantly low VIFs for both year and consonant, and even the interaction term isn't that high between the other two. When we include the interaction term into consideration our vif scores decrease to 1 between year and consonant to show that they are both completely independent of each other.
+
+
+
+
+
+
+
+

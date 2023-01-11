@@ -1,0 +1,131 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+# WrittenFrequency on RTlexdec
+library("tidyverse")
+eng = languageR::english %>% tibble()
+```
+```{r}
+ggplot(eng,aes(WrittenFrequency,RTlexdec)) +
+  geom_point()
+```
+
+```{r}
+fitted_model <- eng %>% 
+  lm(RTlexdec ~ WrittenFrequency, data = .) %>% 
+  print()
+```
+```{r}
+fitted_model %>% summary()
+
+coefs = coefficients(fitted_model)
+
+b = coefs["(Intercept)"]
+m = coefs["WrittenFrequency"]
+
+print(b)
+print(m)
+```
+
+
+```{r}
+eng <- eng %>% 
+  mutate(predicted = predict(fitted_model)) %>% 
+  print()
+```
+```{r}
+eng <- eng %>% 
+  mutate(residual = residuals(fitted_model)) %>% 
+  print()
+```
+
+
+```{r}
+eng %>% 
+  ggplot(aes(WrittenFrequency,RTlexdec))+
+  geom_point() +
+  geom_smooth(method = lm, se = F)+
+  geom_smooth(method = loess, se = F, color = 'red') +
+  geom_abline(slope = m, intercept = b, color = "blue", linetype=3)+
+  #geom_point(aes(y = predicted), color = "red")+
+  theme_minimal()
+  #geom_segment(aes(xend = RTlexdec, yend = predicted), alpha = 0.5) 
+```
+
+
+```{r}
+predict(fitted_model, newdata = tibble(WrittenFrequency = 5))
+```
+
+```{r}
+eng %>% 
+  ggplot(aes(exp(WrittenFrequency)))+
+  geom_histogram()
+
+eng %>% 
+  ggplot(aes(WrittenFrequency))+
+  geom_histogram()
+```
+
+```{r}
+install.packages("C:\\Users\\bryan\\Downloads\\Rling_1.0.tar.gz")
+```
+```{r}
+library("Rling")
+data(ELP)
+```
+```{r}
+ELP %>% 
+  ggplot(aes(Mean_RT))+
+  geom_histogram()+
+  labs(title = "Histogram of raw mean reaction times")
+
+ELP %>% 
+  ggplot(aes(log(Mean_RT)))+
+  geom_histogram()+
+  labs(title = "Histogram of natural logarithm of mean reaction times")
+
+bc <- MASS::boxcox(ELP$Mean_RT ~ 1, lambda = seq(-10, 10, 1/100))
+lambda <- bc$x[which.max(bc$y)]
+ELP %>% 
+  mutate(bc_rt = (Mean_RT ^ lambda - 1) / lambda) %>% 
+  ggplot(aes(bc_rt))+
+  geom_histogram()+
+  labs(title = "Box-Cox transformed mean reaction times")
+```
+
+```{r}
+m1 <- ELP %>% 
+  lm(Mean_RT ~ Length + log(SUBTLWF) + POS, data = .)
+summary(m1)
+```
+
+```{r}
+ELP %>% 
+  ggplot(aes(POS, Mean_RT))+
+  geom_boxplot(notch=T)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
