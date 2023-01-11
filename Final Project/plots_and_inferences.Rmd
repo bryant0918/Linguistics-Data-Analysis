@@ -1,0 +1,271 @@
+---
+title: "Messin Around"
+author: "Bryant"
+date: "2022-11-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+data <- read_csv("spam_ham.csv") %>%
+  mutate(Label = ifelse(Label == "spam", 0,1)) 
+view(data)
+```
+
+
+```{r}
+print(names(data))
+new_data = data %>% pivot_longer(cols = num_subj_adjs:perc_total_intj, 
+                      names_to = "variables",
+                      values_to = "values") %>% 
+  separate(variables, c("count_freq", "subject_content_total", "pos")) %>% 
+  pivot_wider(names_from = c("count_freq", "subject_content_total"),
+              values_from = "values")
+
+```
+
+```{r}
+print(names(new_data))
+plot = new_data %>% filter(num_subj>0, perc_subj>0, num_cont>0, perc_cont>0, num_total>0, perc_total>0) %>% 
+  ggplot(aes(factor(Label), fill = pos)) +
+  geom_bar(position=position_dodge()) 
+  
+ggsave("visualization_dodge.png", height = 7, width = 8, dpi = 300)
+
+plot = new_data %>% filter(num_subj>0, perc_subj>0, num_cont>0, perc_cont>0, num_total>0, perc_total>0) %>% 
+  ggplot(aes(Label, fill = pos)) +
+  geom_bar(position=position_fill()) 
+  
+ggsave("visualization_fill.png", height = 7, width = 8, dpi = 300)
+
+
+```
+
+```{r}
+df_tbl = new_data %>% filter(num_subj>0, perc_subj>0, num_cont>0, perc_cont>0, num_total>0, perc_total>0) %>% 
+  xtabs(~pos + Label, data = .) %>% 
+  print()
+
+means = new_data %>%
+  group_by(pos,Label) %>% 
+  summarise(n = n(),
+            total_mean = mean(num_total),
+            total_mean_perc = mean(perc_total),
+            sd = sd(num_total),
+            subj_mean = mean(num_subj),
+            subj_mean_perc = mean(perc_subj)) %>% 
+            
+
+  print()
+
+ham_adj_subj_count = new_data %>% filter(Label==1,pos=='adjs') %>% 
+  select(num_subj) %>% 
+  view()
+
+spam_adj_subj_count = new_data %>% filter(Label==1,pos=='adjs') %>% 
+  select(num_subj) %>% 
+  view()
+
+write_csv(means,"means.csv")
+
+spam_mean = means %>% filter(Label == 0) %>% 
+  print()
+ham_mean = means %>% filter(Label == 1) %>% 
+  print()
+
+df_table = xtabs(~total_mean + Label, data = means) %>% 
+  print()
+```
+
+## Chi-Squared Test
+```{r}
+rstatix::chisq_test(df_tbl)
+#rstatix::chisq_test(df_tbl, p=c(1-.34684719535, .34684719535))
+```
+Our chi-squared test is extremely small so we have significant reason to reject the null hypothesis that there is not a difference between the two distributions. Now we find Cramer's V.
+
+## Cramer's V
+```{r}
+vcd::assocstats(df_tbl)
+```
+Cramer's V is .106 which is pretty close to 0 so there is a weak association between part of speech and whether I opened the email or not.
+
+# Chi-Squared on each PoS
+We want to see which part of speeches are actually significant. Because it is impossible to tell with 7 degrees of freedom. But now we know at least one of the variables is significant.
+
+## Adjective
+```{r}
+df_tbl = new_data %>% filter(num_total>0, perc_total>0) %>% 
+  filter(pos=="adjs") %>% 
+  xtabs(~num_total + Label, data = .) %>% 
+  print()
+
+data %>% group_by(Label) %>% 
+  count()
+
+new_data %>% group_by(pos) %>% count()
+
+spam_count = 12925
+ham_count = 4483
+```
+
+## Chi-Squared Test
+```{r}
+rstatix::chisq_test(df_tbl)
+```
+Our chi-squared test is extremely small so we have significant reason to reject the null hypothesis that there is not a difference between the two distributions. Now we find Cramer's V.
+
+## Cramer's V
+```{r}
+vcd::assocstats(df_tbl)
+```
+
+# New section
+```{r}
+summary = new_data %>% filter(num_total>0) %>% 
+  group_by(pos) %>% 
+  summarize(n=n(),
+            mean=mean(num_total),
+            sd = sd(num_total))
+print(summary)
+view(new_data)
+```
+
+
+```{r}
+new_data %>% filter(num_total>0) %>% group_by(pos) %>% 
+  ggplot(aes(num_total, color=Label, fill=Label))+
+  geom_density(alpha=.5) +
+  xlim(0,10)
+```
+
+
+```{r}
+# Our naive original model for adjectives
+m_adjs = new_data %>% filter(pos == 'adjs') %>% 
+  lm(Label ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+print(summary(m_adjs))
+
+m_advs = new_data %>% filter(pos == 'advs') %>% 
+  lm(Label ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+print(summary(m_advs))
+
+m_noun = new_data %>% filter(pos == 'noun') %>% 
+  lm(Label ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+print(summary(m_noun))
+
+m_num = new_data %>% filter(pos == 'num') %>% 
+  lm(Label ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+print(summary(m_num))
+
+m_propn = new_data %>% filter(pos == 'propn') %>% 
+  lm(Label ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+print(summary(m_propn))
+
+m_sym = new_data %>% filter(pos == 'sym') %>% 
+  lm(Label ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+print(summary(m_sym))
+
+m_verb = new_data %>% filter(pos == 'verb') %>% 
+  lm(Label ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+print(summary(m_verb))
+
+m_intj = new_data %>% filter(pos == 'intj') %>% 
+  lm(Label ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+print(summary(m_intj))
+```
+
+
+
+```{r}
+cat("Mean of the residuals = ", mean(residuals(m_adjs)))
+```
+
+
+```{r}
+tibble(res = residuals(m_adjs)) %>% 
+  ggplot(aes(res))+
+  geom_histogram()+
+  ggtitle("Histogram of raw residuals")
+```
+
+
+```{r}
+res <- residuals(m_adjs)
+
+ggplot(tibble(residuals(m_adjs)), aes(sample = res))+
+  stat_qq()+
+  stat_qq_line()+
+  ggtitle("Q-Q plot of raw residuals")
+```
+
+```{r}
+# BOX COX not the right thing because lambda will be 0 and then I have divide by 0 error
+lambda <- bc$x[which.max(bc$y)]
+m_adjs2 <- new_data %>% filter(pos == 'adjs') %>% 
+  mutate(bc_rt = (Label ^ lambda - 1) / lambda) %>% 
+  lm(bc_rt ~ num_subj + perc_subj + num_cont + perc_cont + num_total + perc_total, data = .)
+```
+
+
+
+```{r}
+p_adjs = new_data %>% filter(pos == 'adjs') %>% 
+  ggplot(aes(x = factor(Label), y = num_total)) +
+  geom_boxplot(notch=TRUE)+
+  stat_summary(fun=mean)+
+  theme_bw()
+p_adjs
+
+p_advs = new_data %>% filter(pos == 'advs') %>% 
+  ggplot(aes(x = factor(Label), y = num_total)) +
+  geom_boxplot(notch=TRUE)+
+  stat_summary(fun=mean)+
+  theme_bw()
+p_advs
+
+p3 <- data %>%
+  ggplot(aes(x = factor(Label), y = num_total_adjs))+
+  geom_boxplot(notch = TRUE)+
+  stat_summary(fun = mean)+
+  facet_wrap(~num_total_advs)+
+  theme_bw()
+print(p3)
+
+```
+
+```{r}
+m1 <- lm(Label ~ num_total_adjs + num_total_advs, data = data)
+summary(m1)
+```
+
+```{r}
+AIC(m1)
+```
+
+```{r}
+m2 <- lm(Label ~ num_total_adjs + num_total_advs + num_total_adjs:num_total_advs, data = data)
+summary(m2)
+```
+
+```{r}
+AIC(m2)
+```
+
+```{r}
+write_csv(new_data, "spam_ham_pivoted.csv")
+```
+
+
+```{python}
+import numpy as np
+print(np.array([1,2,3]))
+```
+
+
+
+

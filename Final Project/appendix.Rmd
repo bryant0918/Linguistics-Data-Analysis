@@ -1,0 +1,39 @@
+---
+title: "Appendix"
+author: "Bryant"
+date: "2022-12-16"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+### Plots
+```{r}
+# Plots
+plot = data %>% 
+  ggplot(aes(Label, y = pos_total, fill = pos, color = pos)) +
+  geom_col(position=position_dodge()) +
+  theme_light()
+plot
+ggsave("visualization_dodge.png", height = 7, width = 8, dpi = 300)
+plot = data %>% 
+  ggplot(aes(Label, y = pos_total, fill = pos, color = pos)) +
+  geom_col(position=position_fill()) +
+  theme_light()
+plot
+ggsave("visualization_fill.png", height = 7, width = 8, dpi = 300)
+```
+
+## Chi-squared test
+
+```{r}
+df_tbl = means %>%
+  xtabs(~Label + pos_total, data = .) %>% 
+  print()
+```
+```{r}
+rstatix::chisq_test(df_tbl)
+```
